@@ -140,7 +140,7 @@ If you use I‑QGP in your work, please cite:
 ```bibtex
 @misc{iqgp2025,
   title  = {I-QGP: Bilingual Reasoning via an Interlingua QID-Graph Planner},
-  author = {Your Name and Contributors},
+  author = {ErrDivine},
   year   = {2025},
   note   = {GitHub repository}
 }
