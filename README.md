@@ -99,12 +99,13 @@ We go beyond answer accuracy:
 - Planner: Small MLPs for VQ, pointer, and edge scoring (kept compact to avoid leakage)
 
 ### Quickstart
-1. Install dependencies (PyTorch is required). A typical setup:
+1. Install dependencies (PyTorch + HuggingFace stack):
    ```bash
    pip install torch --index-url https://download.pytorch.org/whl/cpu  # pick the wheel that matches your platform
+   pip install transformers datasets
    pip install -e .[dev]
    ```
-2. Run the synthetic training loop:
+2. Run the MGSM-backed training loop (uses `configs/default.yaml`):
    ```bash
    python scripts/train.py --epochs 1 --device cpu
    ```
@@ -112,7 +113,7 @@ We go beyond answer accuracy:
    ```bash
    python -m pytest -q
    ```
-   Tests are skipped automatically when PyTorch is unavailable; install torch to exercise the full coverage.
+   Tests are skipped automatically when PyTorch is unavailable; install torch to exercise the full coverage. To run the synthetic fallback, edit the config to set `dataset.type: synthetic` and `model.use_synthetic_backbone: true`.
 
 For a step-by-step walkthrough covering environment setup, testing, and training, see `docs/experiment_instructions.md`.
 

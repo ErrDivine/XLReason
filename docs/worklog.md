@@ -32,12 +32,17 @@ This log documents the initial implementation of the **I-QGP synthetic experimen
 - `LossBundle` aggregates all components with configurable weights.
 
 ### System (`iqgp/system.py`)
-- `IQGPSystem` wraps backbone → planner → decoders → projector, returning everything needed for objective computation plus an optional code-switch pass.
+- `IQGPSystem` now binds a HuggingFace `TransformerBackbone` (auto-loaded via `transformers`) to the planner.
+- Automatically matches decoder vocabulary to the tokenizer’s vocabulary size; synthetic fallback remains available for tests via `use_synthetic_backbone`.
 - Uses `LanguageAdversary` to discourage language leakage in the encoder.
 
+### Data (`iqgp/data/`)
+- `MGSMReasoningDataset` loads paired EN/ZH samples from `juletxara/mgsm`, aligns them by index, and tokenizes with the shared transformer tokenizer.
+- Existing `SyntheticReasoningDataset` remains for deterministic unit tests.
+
 ### Training (`scripts/train.py` & `iqgp/training/loop.py`)
-- YAML-driven configuration (seed, optimizer, epochs, loss weights, code-switch probability).
-- Synthetic dataset recreates paired EN/zh features, targets, and planner supervision signals.
+- YAML-driven configuration includes transformer + dataset parameters (MGSM vs. synthetic fallback).
+- Training script instantiates the HuggingFace model/tokenizer and reuses them across epochs, then streams MGSM batches via the new loader.
 - Training loop handles logging, gradient clipping, and per-component loss accounting.
 
 ## Testing

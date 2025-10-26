@@ -8,3 +8,11 @@ __all__ = [
     "SyntheticDatasetConfig",
     "SyntheticReasoningDataset",
 ]
+
+try:  # optional dependency on datasets
+    from .mgsm import MGSMConfig, MGSMReasoningDataset
+except ImportError:  # pragma: no cover
+    MGSMConfig = None  # type: ignore
+    MGSMReasoningDataset = None  # type: ignore
+else:
+    __all__.extend(["MGSMConfig", "MGSMReasoningDataset"])

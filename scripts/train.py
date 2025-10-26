@@ -1,4 +1,4 @@
-"""Training script for the synthetic XLReason experiment."""
+"""Training script for the XLReason experiment (transformer-powered)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,12 @@ from typing import Any, Dict
 import torch
 import yaml
 
-from iqgp.data import SyntheticDatasetConfig, SyntheticReasoningDataset
+from iqgp.data import (
+    MGSMConfig,
+    MGSMReasoningDataset,
+    SyntheticDatasetConfig,
+    SyntheticReasoningDataset,
+)
 from iqgp.objectives import LossWeights
 from iqgp.system import IQGPSystem, ModelConfig
 from iqgp.training import train_epoch
@@ -29,8 +34,25 @@ def _set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
 
 
+def _build_dataset(dataset_cfg: Dict[str, Any], system: IQGPSystem, device: torch.device):
+    dtype = dataset_cfg.get("type", "synthetic")
+    if dtype == "mgsm":
+        if MGSMConfig is None or MGSMReasoningDataset is None:
+            raise RuntimeError("datasets package is required for MGSM loading")
+        mgsm_cfg = MGSMConfig(**dataset_cfg["mgsm"])
+        try:
+            tokenizer = system.tokenizer
+        except AttributeError as exc:
+            raise RuntimeError("Transformer backbone required for MGSM dataset") from exc
+        return MGSMReasoningDataset(mgsm_cfg, tokenizer, device=device)
+    if dtype == "synthetic":
+        syn_cfg = SyntheticDatasetConfig(**dataset_cfg.get("synthetic", {}))
+        return SyntheticReasoningDataset(syn_cfg, device=device)
+    raise ValueError(f"Unknown dataset type: {dtype}")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train the synthetic XLReason experiment")
+    parser = argparse.ArgumentParser(description="Train the XLReason experiment")
     parser.add_argument("--config", type=Path, default=Path("configs/default.yaml"), help="YAML configuration file")
     parser.add_argument("--epochs", type=int, default=None, help="Override number of epochs")
     parser.add_argument("--device", type=str, default=None, help="Device to run on (cpu or cuda)")
@@ -43,7 +65,6 @@ def main() -> None:
     device = torch.device(args.device or ("cuda" if torch.cuda.is_available() else "cpu"))
 
     model_cfg = ModelConfig(**cfg["model"])
-    dataset_cfg = SyntheticDatasetConfig(**cfg["dataset"])
     loss_weights = LossWeights(**cfg["loss_weights"])
     training_cfg = cfg["training"]
     epochs = args.epochs or training_cfg.get("epochs", 1)
@@ -57,8 +78,9 @@ def main() -> None:
     logger = ProgressLogger(log_every=training_cfg.get("log_every", 5))
     code_switch_prob = training_cfg.get("code_switch_prob", 0.15)
 
+    dataset = _build_dataset(cfg["dataset"], system=model, device=device)
+
     for epoch in range(1, epochs + 1):
-        dataset = SyntheticReasoningDataset(dataset_cfg, device=device)
         metrics = train_epoch(
             model=model,
             optimizer=optimizer,

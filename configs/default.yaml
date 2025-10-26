@@ -1,7 +1,7 @@
-# Default configuration for XLReason synthetic experiment
+# Default configuration for XLReason experiment powered by transformers
 seed: 13
 training:
-  lr: 0.0003
+  lr: 3e-4
   weight_decay: 0.01
   epochs: 1
   log_every: 5
@@ -13,23 +13,42 @@ loss_weights:
   csd: 0.2
   erase: 0.2
 model:
-  hidden_size: 128
-  vocab_size: 256
-  num_entities: 32
-  num_units: 16
-  num_nodes: 8
-  codebook_size: 64
-  embedding_dim: 128
+  vocab_size: null
+  num_entities: 128
+  num_units: 32
+  num_nodes: 16
+  codebook_size: 128
+  embedding_dim: 256
   num_edge_types: 4
   commitment_cost: 0.25
   attn_heads: 4
-  projection_dim: 96
+  projection_dim: 128
+  hf_model_name: "Qwen/Qwen2.5-Math-7B"
+  hf_tokenizer_name: null
+  hf_revision: null
+  hf_cache_dir: null
+  hf_trust_remote_code: false
+  hf_use_fast_tokenizer: true
+  use_synthetic_backbone: false
+
 dataset:
-  vocab_size: 256
-  hidden_size: 128
-  num_entities: 32
-  num_units: 16
-  seq_len: 12
-  batch_size: 4
-  num_batches: 25
-  num_nodes: 8
+  type: mgsm
+  mgsm:
+    dataset_name: "juletxara/mgsm"
+    languages: ["en", "zh"]
+    split: "train"
+    max_length: 256
+    batch_size: 2
+    max_samples: 32
+    num_entities: 128
+    num_units: 32
+    num_nodes: 16
+  synthetic:
+    vocab_size: 256
+    hidden_size: 128
+    num_entities: 32
+    num_units: 16
+    seq_len: 12
+    batch_size: 4
+    num_batches: 25
+    num_nodes: 8

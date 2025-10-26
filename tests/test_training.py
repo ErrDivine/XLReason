@@ -16,7 +16,6 @@ def test_single_epoch_training_runs_without_error():
 
     torch.manual_seed(3)
     model_cfg = ModelConfig(
-        hidden_size=32,
         vocab_size=40,
         num_entities=12,
         num_units=9,
@@ -25,6 +24,8 @@ def test_single_epoch_training_runs_without_error():
         embedding_dim=32,
         num_edge_types=3,
         projection_dim=24,
+        hidden_size=32,
+        use_synthetic_backbone=True,
     )
     system = IQGPSystem(model_cfg)
     optimizer = torch.optim.AdamW(system.parameters(), lr=1e-3)

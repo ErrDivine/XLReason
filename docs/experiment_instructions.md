@@ -1,13 +1,13 @@
-# I-QGP Synthetic Experiment Instructions
+# I-QGP Experiment Instructions
 
-This guide walks you through preparing the environment, validating the installation, and running the synthetic I-QGP experiment. Follow the steps in order; each stage builds on the previous one.
+This guide walks you through preparing the environment, validating the installation, and running the transformer-powered I-QGP experiment. Follow the steps in order; each stage builds on the previous one.
 
 ---
 
 ## 1. Prerequisites
 - **Python**: 3.10 or newer (3.11 recommended).
 - **Operating system**: macOS, Linux, or Windows with WSL. The quickstart assumes shell access.
-- **Dependencies**: PyTorch (CPU or CUDA build), PyYAML, NumPy, and pytest for development/test runs.
+- **Dependencies**: PyTorch (CPU or CUDA build), `transformers`, `datasets`, PyYAML, NumPy, and pytest for development/test runs.
 
 ```bash
 python --version  # Should print 3.10+
@@ -49,12 +49,17 @@ Keep the environment active for the remaining steps.
    ```
    For GPU builds, follow the [official PyTorch instructions](https://pytorch.org/get-started/locally/).
 
-2. **Install the project (and dev extras)**
+2. **Install transformer & datasets tooling**
+   ```bash
+   pip install transformers datasets
+   ```
+
+3. **Install the project (and dev extras)**
    ```bash
    pip install -e .[dev]
    ```
 
-3. **Verify the installation**
+4. **Verify the installation**
    ```bash
    python -c "import torch; print(torch.__version__)"
    ```
@@ -66,8 +71,8 @@ Keep the environment active for the remaining steps.
 Default settings live in `configs/default.yaml`. Adjust model size, dataset dimensions, or training hyperparameters as needed before running experiments.
 
 Key sections:
-- `model`: hidden sizes, planner topology, VQ codebook parameters.
-- `dataset`: synthetic data generator dimensions.
+- `model`: transformer model identifiers and planner hyperparameters. By default this references **Qwen/Qwen2.5-Math-7B**; adjust to a smaller model if GPU memory is limited.
+- `dataset`: choose `type: mgsm` (default) for real bilingual data or `type: synthetic` when you want the lightweight mock pipeline. MGSM settings include languages, split, max sequence length, and sample budget.
 - `training`: optimizer settings, epochs, logging cadence, and code-switch probability.
 - `loss_weights`: coefficients for the auxiliary objectives.
 
@@ -85,7 +90,7 @@ python -m pytest -q
 
 ---
 
-## 7. Launch the Synthetic Training Run
+## 7. Launch the Training Run (MGSM by default)
 Execute the training script (uses the YAML config by default):
 
 ```bash
@@ -95,6 +100,8 @@ python scripts/train.py --epochs 1 --device cpu
 Notes:
 - Use `--device cuda` when running on a GPU-enabled machine.
 - Adjust `--config` to point at a custom YAML file if you created one.
+- When `dataset.type` is `mgsm`, the loader pulls paired English–Chinese items from `juletxara/mgsm` using the shared transformer tokenizer.
+- To run the synthetic toy pipeline instead, set `dataset.type: synthetic` and `model.use_synthetic_backbone: true` in your config.
 - Training logs (loss, task, emd) stream to stdout via `ProgressLogger` every `log_every` steps.
 
 ---
@@ -116,6 +123,8 @@ Notes:
 | Symptom | Resolution |
 | --- | --- |
 | `ModuleNotFoundError: No module named 'torch'` | Re-run Step 4.1 with the correct PyTorch wheel. |
+| `ModuleNotFoundError: No module named 'transformers'` | Execute Step 4.2. |
+| `datasets.builder.DatasetNotFoundError` | Ensure you spelled the dataset/config correctly (defaults to `juletxara/mgsm`). |
 | Tests skipped because PyTorch missing | Same as above—install PyTorch, then rerun `pytest`. |
 | CUDA runtime errors | Ensure the PyTorch install matches your CUDA toolkit or fall back to CPU build. |
 | Slow CPU training | Reduce `num_nodes`, `embedding_dim`, or `batch_size` in the config. |
