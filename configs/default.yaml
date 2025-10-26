@@ -1,0 +1,35 @@
+# Default configuration for XLReason synthetic experiment
+seed: 13
+training:
+  lr: 0.0003
+  weight_decay: 0.01
+  epochs: 1
+  log_every: 5
+  code_switch_prob: 0.15
+loss_weights:
+  emd: 0.5
+  plan: 0.5
+  entity: 0.5
+  csd: 0.2
+  erase: 0.2
+model:
+  hidden_size: 128
+  vocab_size: 256
+  num_entities: 32
+  num_units: 16
+  num_nodes: 8
+  codebook_size: 64
+  embedding_dim: 128
+  num_edge_types: 4
+  commitment_cost: 0.25
+  attn_heads: 4
+  projection_dim: 96
+dataset:
+  vocab_size: 256
+  hidden_size: 128
+  num_entities: 32
+  num_units: 16
+  seq_len: 12
+  batch_size: 4
+  num_batches: 25
+  num_nodes: 8

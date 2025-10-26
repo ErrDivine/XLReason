@@ -1,76 +1,85 @@
-"""Data structures for planner outputs."""
+"""Graph data structures for the interlingua planner."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Sequence
 
 import torch
 
 
 @dataclass
-class PlannerGraph:
-    """Container for planner outputs.
+class GraphNode:
+    """Lightweight container for a single planner node."""
+
+    op_code: int
+    args: Sequence[int]
+    qids: Sequence[int]
+    units: Sequence[int]
+    evidence_ptrs: Sequence[int]
+
+
+@dataclass
+class GraphEdge:
+    """Typed, directed dependency edge."""
+
+    src: int
+    dst: int
+    label: int
+
+
+@dataclass
+class InterlinguaGraph:
+    """Tensor representation of planner outputs.
 
     Attributes:
-        node_states: Tensor of shape (batch, num_nodes, hidden_size).
-        codes: Tensor of shape (batch, num_nodes) with VQ code indices.
-        qid_logits: Tensor of shape (batch, num_nodes, num_entities).
-        unit_logits: Tensor of shape (batch, num_nodes, num_units).
-        edge_logits: Tensor of shape (batch, num_nodes, num_nodes).
-        node_mask: Bool tensor indicating valid nodes (batch, num_nodes).
+        codes: LongTensor [B, K] of vector-quantized code indices.
+        node_states: Tensor [B, K, D] quantized node embeddings.
+        arg_logits: Tensor [B, K, K] pointer scores for node arguments.
+        edge_logits: Tensor [B, K, K, R] scores over edge relation labels.
+        qid_logits: Tensor [B, K, E] entity pointer scores.
+        unit_logits: Tensor [B, K, U] unit pointer scores.
+        evidence_logits: Optional Tensor [B, K, S] evidence span scores.
     """
 
-    node_states: torch.Tensor
     codes: torch.Tensor
+    node_states: torch.Tensor
+    arg_logits: torch.Tensor
+    edge_logits: torch.Tensor
     qid_logits: torch.Tensor
     unit_logits: torch.Tensor
-    edge_logits: torch.Tensor
-    node_mask: torch.Tensor
+    evidence_logits: Optional[torch.Tensor] = None
 
-    def masked_node_states(self) -> torch.Tensor:
-        """Return node states with padded positions zeroed out."""
-        if self.node_mask.dtype != torch.bool:
-            raise ValueError("node_mask must be a boolean tensor")
-        return self.node_states * self.node_mask.unsqueeze(-1)
+    def num_nodes(self) -> int:
+        return int(self.codes.shape[-1])
 
-    def adjacency(self, threshold: float = 0.0) -> torch.Tensor:
-        """Return a binary adjacency matrix using the provided threshold."""
-        return (self.edge_logits > threshold).to(self.edge_logits.dtype)
+    def detach(self) -> "InterlinguaGraph":
+        """Return a copy with all tensors detached."""
 
-    def split_states(self) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Split states into active and padded tensors."""
-        mask = self.node_mask.unsqueeze(-1).expand(-1, -1, self.node_states.size(-1))
-        if mask.any():
-            active = self.node_states[mask].reshape(-1, self.node_states.size(-1))
-        else:
-            active = self.node_states.new_zeros((0, self.node_states.size(-1)))
-        padded_mask = ~mask
-        if padded_mask.any():
-            padded = self.node_states[padded_mask].reshape(-1, self.node_states.size(-1))
-        else:
-            padded = self.node_states.new_zeros((0, self.node_states.size(-1)))
-        return active, padded
+        kwargs = {
+            "codes": self.codes.detach(),
+            "node_states": self.node_states.detach(),
+            "arg_logits": self.arg_logits.detach(),
+            "edge_logits": self.edge_logits.detach(),
+            "qid_logits": self.qid_logits.detach(),
+            "unit_logits": self.unit_logits.detach(),
+            "evidence_logits": self.evidence_logits.detach() if self.evidence_logits is not None else None,
+        }
+        return InterlinguaGraph(**kwargs)
 
-    def detach(self) -> "PlannerGraph":
-        """Detach all tensors from the graph for logging or evaluation."""
-        return PlannerGraph(
-            node_states=self.node_states.detach(),
-            codes=self.codes.detach(),
-            qid_logits=self.qid_logits.detach(),
-            unit_logits=self.unit_logits.detach(),
-            edge_logits=self.edge_logits.detach(),
-            node_mask=self.node_mask.detach(),
-        )
+    def to_dict(self) -> dict:
+        """Convert the graph into a JSON-serializable dictionary."""
 
-    def to(self, device: Optional[torch.device] = None) -> "PlannerGraph":
-        """Move tensors to the given device."""
-        if device is None:
-            return self
-        return PlannerGraph(
-            node_states=self.node_states.to(device),
-            codes=self.codes.to(device),
-            qid_logits=self.qid_logits.to(device),
-            unit_logits=self.unit_logits.to(device),
-            edge_logits=self.edge_logits.to(device),
-            node_mask=self.node_mask.to(device),
-        )
+        payload = {
+            "codes": self.codes.detach().cpu().tolist(),
+            "edges": self.edge_logits.detach().cpu().tolist(),
+            "args": self.arg_logits.detach().cpu().tolist(),
+            "qids": self.qid_logits.detach().cpu().tolist(),
+            "units": self.unit_logits.detach().cpu().tolist(),
+        }
+        if self.evidence_logits is not None:
+            payload["evidence"] = self.evidence_logits.detach().cpu().tolist()
+        return payload
+
+
+__all__ = ["GraphNode", "GraphEdge", "InterlinguaGraph"]

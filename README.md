@@ -99,9 +99,22 @@ We go beyond answer accuracy:
 - Planner: Small MLPs for VQ, pointer, and edge scoring (kept compact to avoid leakage)
 
 ### Quickstart
-1. `pip install -r requirements.txt` to pull the minimal PyTorch + pytest stack used across scripts and tests.
-2. `python scripts/train.py --steps 50 --log-every 5 --cs-prob 0.15` exercises the synthetic pipeline with stochastic code-switch dropout.
-3. `python -m pytest -q` validates planner, loss, and reasoner behavior (ensure your temp directory is writable when running inside a sandbox).
+1. Install dependencies (PyTorch is required). A typical setup:
+   ```bash
+   pip install torch --index-url https://download.pytorch.org/whl/cpu  # pick the wheel that matches your platform
+   pip install -e .[dev]
+   ```
+2. Run the synthetic training loop:
+   ```bash
+   python scripts/train.py --epochs 1 --device cpu
+   ```
+3. Execute the pytest suite:
+   ```bash
+   python -m pytest -q
+   ```
+   Tests are skipped automatically when PyTorch is unavailable; install torch to exercise the full coverage.
+
+For a step-by-step walkthrough covering environment setup, testing, and training, see `docs/experiment_instructions.md`.
 
 ### Repo Structure
 ```

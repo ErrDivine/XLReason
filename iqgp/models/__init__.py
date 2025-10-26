@@ -1,10 +1,12 @@
-"""Model exports."""
-from .backbone import BilingualReasoner, LanguageAdapter, LanguageDecoder, ReasonerOutput, SharedBackbone
+"""Model components for I-QGP."""
+
+from .decoders import CoTDecoder, AnswerDecoder
+from .backbone import BilingualBackbone
+from .lexicon import LexiconProjector
 
 __all__ = [
-    "BilingualReasoner",
-    "LanguageAdapter",
-    "LanguageDecoder",
-    "ReasonerOutput",
-    "SharedBackbone",
+    "CoTDecoder",
+    "AnswerDecoder",
+    "BilingualBackbone",
+    "LexiconProjector",
 ]

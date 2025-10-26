@@ -1,4 +1,7 @@
-"""XLReason bilingual reasoning package."""
-from . import data, models, objectives, planner, utils
+"""XLReason I-QGP package."""
 
-__all__ = ["data", "models", "objectives", "planner", "utils"]
+__all__ = [
+    "__version__",
+]
+
+__version__ = "0.1.0"

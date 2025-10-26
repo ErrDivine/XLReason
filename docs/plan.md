@@ -221,3 +221,13 @@ def loss_total(batch):
 - ≥Y% bilingual agreement without sacrificing accuracy.
 - Stat-sig gains on **transfer** (EN→ZH and ZH→EN) and **code-switch** stress.
 - Evidence that planner states are language-invariant (adversary AUC ≈ 50%) while **entity/unit** alignment improves.
+
+
+## 13) Resources scheduled to use
+- Basebone model: Qwen2.5-Math-7B
+- dataset: juletxara/mgsm (from transformer)
+```python
+# Exmaple usage. We aim on Chinese and English.
+from datasets import load_dataset
+ds = load_dataset("juletxara/mgsm", "en")
+```

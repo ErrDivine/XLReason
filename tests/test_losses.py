@@ -1,82 +1,85 @@
-"""Unit tests for the bilingual loss helpers."""
-
 import pytest
 
-
-torch = pytest.importorskip("torch")
-
-from iqgp.objectives.lexicon import LexiconProjector
-from iqgp.objectives.losses import (
-    SinkhornDistance,
-    code_switch_consistency,
-    emd_bilingual,
-    entity_unit_agreement,
-    info_nce_loss,
-    language_eraser_loss,
-)
+try:
+    import torch
+except ImportError:
+    torch = None
 
 
-def test_emd_loss_runs():
-    torch.manual_seed(0)
-    batch, seq_len, vocab, proj_dim = 2, 4, 10, 6
-    logits_en = torch.randn(batch, seq_len, vocab)
-    logits_zh = torch.randn(batch, seq_len, vocab)
-    projector = LexiconProjector(vocab, proj_dim)
-    loss = emd_bilingual(logits_en, logits_zh, projector)
-    assert loss.item() >= 0
+@pytest.mark.skipif(torch is None, reason="PyTorch is required for loss tests")
+def test_loss_components_backpropagate():
+    from iqgp.objectives import LossWeights, compute_total_loss
+    from iqgp.planner import InterlinguaPlanner
 
-
-def test_contrastive_and_agreement_losses():
     torch.manual_seed(1)
-    batch, hidden, classes = 3, 12, 7
-    anchor = torch.randn(batch, hidden)
-    positive = torch.randn(batch, hidden)
-    contrast = info_nce_loss(anchor, positive)
-    assert torch.isfinite(contrast)
+    batch = 2
+    length = 5
+    hidden = 16
+    vocab = 11
+    num_nodes = 4
 
-    qid_en = torch.randn(batch, classes)
-    qid_zh = torch.randn(batch, classes)
-    unit_en = torch.randn(batch, classes)
-    unit_zh = torch.randn(batch, classes)
-    agreement = entity_unit_agreement(qid_en, qid_zh, unit_en, unit_zh)
-    assert torch.isfinite(agreement)
+    planner = InterlinguaPlanner(
+        hidden_size=hidden,
+        num_nodes=num_nodes,
+        codebook_size=8,
+        embedding_dim=hidden,
+        num_entities=9,
+        num_units=7,
+    )
+    en_hidden = torch.randn(batch, length, hidden, requires_grad=True)
+    zh_hidden = torch.randn(batch, length, hidden, requires_grad=True)
+    planner_output = planner(en_hidden, zh_hidden)
 
-    qid_en_3d = torch.randn(batch, 2, classes)
-    qid_zh_3d = torch.randn(batch, 2, classes)
-    unit_en_3d = torch.randn(batch, 2, classes)
-    unit_zh_3d = torch.randn(batch, 2, classes)
-    agreement_3d = entity_unit_agreement(qid_en_3d, qid_zh_3d, unit_en_3d, unit_zh_3d)
-    assert torch.isfinite(agreement_3d)
+    answer_logits_en = torch.randn(batch, vocab, requires_grad=True)
+    answer_logits_zh = torch.randn(batch, vocab, requires_grad=True)
+    answers_en = torch.randint(vocab, (batch,))
+    answers_zh = torch.randint(vocab, (batch,))
 
+    cot_logits_en = torch.randn(batch, length, vocab, requires_grad=True)
+    cot_logits_zh = torch.randn(batch, length, vocab, requires_grad=True)
+    cot_en = torch.randint(vocab, (batch, length))
+    cot_zh = torch.randint(vocab, (batch, length))
 
-def test_language_eraser_and_csd():
-    torch.manual_seed(2)
-    num_samples, classes = 5, 8
-    preds = torch.randn(num_samples, classes)
-    targets = torch.randint(0, classes, (num_samples,))
-    csd = code_switch_consistency(preds, targets)
-    assert torch.isfinite(csd)
+    projected_en = torch.randn(batch, length, hidden, requires_grad=True)
+    projected_zh = torch.randn(batch, length, hidden, requires_grad=True)
 
-    logits = torch.randn(num_samples, 2)
-    labels = torch.randint(0, 2, (num_samples,))
-    erase = language_eraser_loss(logits, labels)
-    assert torch.isfinite(erase)
+    plan_states_en = torch.randn(batch, hidden, requires_grad=True)
+    plan_states_zh = torch.randn(batch, hidden, requires_grad=True)
 
-    mask = torch.tensor([True, False, True, False, True])
-    csd_masked = code_switch_consistency(preds, targets, mask=mask)
-    assert torch.isfinite(csd_masked)
+    entity_targets = torch.randint(9, (batch, num_nodes))
+    unit_targets = torch.randint(7, (batch, num_nodes))
 
-    empty_mask = torch.zeros(num_samples, dtype=torch.bool)
-    csd_empty = code_switch_consistency(preds, targets, mask=empty_mask)
-    assert csd_empty.item() == pytest.approx(0.0)
+    adversary_logits = torch.randn(batch * 2, 2, requires_grad=True)
+    language_targets = torch.cat([
+        torch.zeros(batch, dtype=torch.long),
+        torch.ones(batch, dtype=torch.long),
+    ])
 
+    total, bundle = compute_total_loss(
+        planner_output=planner_output,
+        answer_logits_en=answer_logits_en,
+        answer_logits_zh=answer_logits_zh,
+        answer_targets_en=answers_en,
+        answer_targets_zh=answers_zh,
+        projected_en=projected_en,
+        projected_zh=projected_zh,
+        plan_states_en=plan_states_en,
+        plan_states_zh=plan_states_zh,
+        entity_targets=entity_targets,
+        unit_targets=unit_targets,
+        loss_weights=LossWeights(),
+        cot_logits_en=cot_logits_en,
+        cot_logits_zh=cot_logits_zh,
+        cot_targets_en=cot_en,
+        cot_targets_zh=cot_zh,
+        switched_graph=planner_output.graph,
+        adversary_logits=adversary_logits,
+        language_targets=language_targets,
+    )
 
-def test_sinkhorn_distance_symmetry():
-    torch.manual_seed(3)
-    sinkhorn = SinkhornDistance()
-    x = torch.randn(2, 3, 4)
-    y = torch.randn(2, 3, 4)
-    dist_xy = sinkhorn(x, y)
-    dist_yx = sinkhorn(y, x)
-    assert torch.isfinite(dist_xy)
-    assert torch.isfinite(dist_yx)
+    total.backward()
+    assert total.item() > 0
+    assert bundle.task.item() > 0
+    assert planner_output.graph.node_states.grad is None
+    assert answer_logits_en.grad is not None
+    assert adversary_logits.grad is not None
