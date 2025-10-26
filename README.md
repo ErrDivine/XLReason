@@ -98,6 +98,11 @@ We go beyond answer accuracy:
 - Training: LoRA + 4-bit quantization → **single-GPU** feasible
 - Planner: Small MLPs for VQ, pointer, and edge scoring (kept compact to avoid leakage)
 
+### Quickstart
+1. `pip install -r requirements.txt` to pull the minimal PyTorch + pytest stack used across scripts and tests.
+2. `python scripts/train.py --steps 50 --log-every 5 --cs-prob 0.15` exercises the synthetic pipeline with stochastic code-switch dropout.
+3. `python -m pytest -q` validates planner, loss, and reasoner behavior (ensure your temp directory is writable when running inside a sandbox).
+
 ### Repo Structure
 ```
 docs/              # Figures & diagrams

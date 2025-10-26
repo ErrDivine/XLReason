@@ -68,15 +68,32 @@ def info_nce_loss(anchor: torch.Tensor, positive: torch.Tensor, temperature: flo
 
 
 def entity_unit_agreement(qid_en: torch.Tensor, qid_zh: torch.Tensor, unit_en: torch.Tensor, unit_zh: torch.Tensor) -> torch.Tensor:
-    qid_loss = F.cross_entropy(qid_en, qid_zh.argmax(dim=-1))
-    unit_loss = F.cross_entropy(unit_en, unit_zh.argmax(dim=-1))
+    def _cross_entropy_from_logits(logits: torch.Tensor, target_logits: torch.Tensor) -> torch.Tensor:
+        if logits.shape != target_logits.shape:
+            raise ValueError("Logit tensors must share the same shape")
+        if logits.size(-1) <= 1:
+            raise ValueError("Logits must have at least two classes in the last dimension")
+        flat_logits = logits.reshape(-1, logits.size(-1))
+        targets = target_logits.argmax(dim=-1).reshape(-1)
+        return F.cross_entropy(flat_logits, targets)
+
+    qid_loss = _cross_entropy_from_logits(qid_en, qid_zh)
+    unit_loss = _cross_entropy_from_logits(unit_en, unit_zh)
     return qid_loss + unit_loss
 
 
-def code_switch_consistency(predictions: torch.Tensor, targets: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+def code_switch_consistency(
+    predictions: torch.Tensor,
+    targets: torch.Tensor,
+    mask: Optional[torch.Tensor] = None,
+) -> torch.Tensor:
     if mask is not None:
+        if mask.dtype != torch.bool:
+            raise ValueError("Mask for code switch consistency must be boolean")
         predictions = predictions[mask]
         targets = targets[mask]
+        if predictions.numel() == 0:
+            return predictions.new_zeros(())
     return F.cross_entropy(predictions, targets)
 
 

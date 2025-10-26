@@ -29,6 +29,28 @@ def build_candidates(batch_size: int, max_nodes: int, num_entities: int, num_uni
     return (ent_embeds, ent_mask), (unit_embeds, unit_mask)
 
 
+def apply_code_switch_dropout(
+    en_tokens: torch.Tensor,
+    zh_tokens: torch.Tensor,
+    probability: float,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Swap EN/ZH token representations at random positions to simulate code-switch dropout."""
+    if probability <= 0.0:
+        mask = torch.zeros(en_tokens.size(0), en_tokens.size(1), dtype=torch.bool, device=en_tokens.device)
+        return en_tokens, zh_tokens, mask
+
+    swap_mask = torch.rand(en_tokens.size(0), en_tokens.size(1), device=en_tokens.device) < probability
+    if not swap_mask.any():
+        return en_tokens, zh_tokens, swap_mask
+
+    swap_mask_expanded = swap_mask.unsqueeze(-1).expand_as(en_tokens)
+    en_swapped = en_tokens.clone()
+    zh_swapped = zh_tokens.clone()
+    en_swapped[swap_mask_expanded] = zh_tokens[swap_mask_expanded]
+    zh_swapped[swap_mask_expanded] = en_tokens[swap_mask_expanded]
+    return en_swapped, zh_swapped, swap_mask
+
+
 def train(args: argparse.Namespace) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     dataset = SyntheticBilingualDataset(
@@ -61,14 +83,21 @@ def train(args: argparse.Namespace) -> None:
         answer_en = answer_en.to(device)
         answer_zh = answer_zh.to(device)
 
+        en_tokens, zh_tokens, csd_mask = apply_code_switch_dropout(en_tokens, zh_tokens, args.cs_prob)
+
         entity_candidates, unit_candidates = build_candidates(en_tokens.size(0), args.max_nodes, args.entities, args.units, args.hidden)
         entity_candidates = (entity_candidates[0].to(device), entity_candidates[1].to(device))
         unit_candidates = (unit_candidates[0].to(device), unit_candidates[1].to(device))
 
         output = model(en_tokens, zh_tokens, entity_candidates, unit_candidates, en_mask=en_mask, zh_mask=zh_mask)
 
-        ce_en = F.cross_entropy(output.en_logits.view(-1, output.en_logits.size(-1)), answer_en.view(-1))
-        ce_zh = F.cross_entropy(output.zh_logits.view(-1, output.zh_logits.size(-1)), answer_zh.view(-1))
+        en_logits_flat = output.en_logits.view(-1, output.en_logits.size(-1))
+        zh_logits_flat = output.zh_logits.view(-1, output.zh_logits.size(-1))
+        answers_en_flat = answer_en.view(-1)
+        answers_zh_flat = answer_zh.view(-1)
+
+        ce_en = F.cross_entropy(en_logits_flat, answers_en_flat)
+        ce_zh = F.cross_entropy(zh_logits_flat, answers_zh_flat)
         task_loss = ce_en + ce_zh
 
         emd_loss = emd_bilingual(output.en_logits, output.zh_logits, projector)
@@ -77,11 +106,18 @@ def train(args: argparse.Namespace) -> None:
         plan_loss = info_nce_loss(pooled_en, pooled_zh)
 
         ent_loss = entity_unit_agreement(output.graph.qid_logits, output.graph.qid_logits, output.graph.unit_logits, output.graph.unit_logits)
-        csd_loss = code_switch_consistency(output.en_logits.view(-1, output.en_logits.size(-1)), answer_en.view(-1))
+        csd_mask_flat = csd_mask.view(-1)
+        csd_loss_en = code_switch_consistency(en_logits_flat, answers_en_flat, mask=csd_mask_flat)
+        csd_loss_zh = code_switch_consistency(zh_logits_flat, answers_zh_flat, mask=csd_mask_flat)
+        csd_loss = 0.5 * (csd_loss_en + csd_loss_zh)
 
-        adversary_logits = adversary(output.graph.node_states.view(-1, output.graph.node_states.size(-1)))
-        lang_labels = torch.zeros(adversary_logits.size(0), dtype=torch.long, device=device)
-        erase_loss = language_eraser_loss(adversary_logits, lang_labels)
+        active_states, _ = output.graph.split_states()
+        if active_states.numel() > 0:
+            adversary_logits = adversary(active_states, lambda_=1.0)
+            lang_labels = torch.zeros(active_states.size(0), dtype=torch.long, device=device)
+            erase_loss = language_eraser_loss(adversary_logits, lang_labels)
+        else:
+            erase_loss = torch.zeros((), device=device)
 
         loss = task_loss + 0.5 * emd_loss + 0.5 * plan_loss + 0.5 * ent_loss + 0.2 * csd_loss + 0.2 * erase_loss + output.vq_loss
 
@@ -109,6 +145,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--log-every", type=int, default=1)
+    parser.add_argument("--cs-prob", type=float, default=0.0, help="Probability of swapping EN/ZH tokens for code-switch dropout")
     return parser.parse_args()
 
 

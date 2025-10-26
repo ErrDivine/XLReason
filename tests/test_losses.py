@@ -41,6 +41,13 @@ def test_contrastive_and_agreement_losses():
     agreement = entity_unit_agreement(qid_en, qid_zh, unit_en, unit_zh)
     assert torch.isfinite(agreement)
 
+    qid_en_3d = torch.randn(batch, 2, classes)
+    qid_zh_3d = torch.randn(batch, 2, classes)
+    unit_en_3d = torch.randn(batch, 2, classes)
+    unit_zh_3d = torch.randn(batch, 2, classes)
+    agreement_3d = entity_unit_agreement(qid_en_3d, qid_zh_3d, unit_en_3d, unit_zh_3d)
+    assert torch.isfinite(agreement_3d)
+
 
 def test_language_eraser_and_csd():
     torch.manual_seed(2)
@@ -54,6 +61,14 @@ def test_language_eraser_and_csd():
     labels = torch.randint(0, 2, (num_samples,))
     erase = language_eraser_loss(logits, labels)
     assert torch.isfinite(erase)
+
+    mask = torch.tensor([True, False, True, False, True])
+    csd_masked = code_switch_consistency(preds, targets, mask=mask)
+    assert torch.isfinite(csd_masked)
+
+    empty_mask = torch.zeros(num_samples, dtype=torch.bool)
+    csd_empty = code_switch_consistency(preds, targets, mask=empty_mask)
+    assert csd_empty.item() == pytest.approx(0.0)
 
 
 def test_sinkhorn_distance_symmetry():
