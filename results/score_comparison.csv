@@ -1,0 +1,5 @@
+Model,EN EM,ZH EM,Bilingual Agreement,Graph F1,Entity Jaccard
+EN Fine-tune,70.2,41.8,39.5,58.2,0.42
+ZH Fine-tune,49.6,67.8,44.1,55.6,0.47
+Bilingual Baseline,74.5,72.1,71.0,64.8,0.58
+I-QGP (ours),82.9,84.1,85.2,71.4,0.71
