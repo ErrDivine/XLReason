@@ -76,6 +76,7 @@ def test_vq_multi_step_no_graph_error():
         loss.backward()
 
 
+@pytest.mark.skipif(torch is None, reason="PyTorch is required")
 def test_vq_invalid_config_raises():
     from iqgp.planner.vq import VectorQuantizerEMA
 

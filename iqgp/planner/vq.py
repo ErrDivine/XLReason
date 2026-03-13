@@ -71,7 +71,7 @@ class VectorQuantizerEMA(nn.Module):
             with torch.no_grad():
                 updated_cluster_size = encodings.sum(dim=0)
                 self.ema_cluster_size.mul_(self.decay).add_(updated_cluster_size, alpha=1 - self.decay)
-                dw = torch.matmul(encodings.t(), flat_inputs)
+                dw = torch.matmul(encodings.t(), flat_inputs.detach())
                 self.ema_w.mul_(self.decay).add_(dw, alpha=1 - self.decay)
 
                 n = self.ema_cluster_size.sum()
