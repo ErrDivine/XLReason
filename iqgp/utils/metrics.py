@@ -8,7 +8,9 @@ import torch
 
 
 def bilingual_agreement(en_answers: Sequence[str], zh_answers: Sequence[str]) -> float:
-    total = max(len(en_answers), 1)
+    total = min(len(en_answers), len(zh_answers))
+    if total == 0:
+        return 0.0
     matches = sum(a == b for a, b in zip(en_answers, zh_answers))
     return matches / total
 

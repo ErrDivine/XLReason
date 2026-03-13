@@ -16,7 +16,7 @@ def _compute_l2_distance(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     x_sq = (x ** 2).sum(dim=-1, keepdim=True)
     y_sq = (y ** 2).sum(dim=-1).unsqueeze(0)
     distance = x_sq + y_sq - 2 * torch.matmul(x, y.t())
-    return distance
+    return distance.clamp(min=0.0)
 
 
 @dataclass
@@ -66,16 +66,17 @@ class VectorQuantizerEMA(nn.Module):
         encodings = F.one_hot(encoding_indices, self.num_embeddings).type(flat_inputs.dtype)
         quantized = torch.matmul(encodings, self.embedding).view(orig_shape)
 
-        # EMA updates
+        # EMA updates (no_grad to avoid retaining computation graph across batches)
         if self.training:
-            updated_cluster_size = encodings.sum(dim=0)
-            self.ema_cluster_size.mul_(self.decay).add_(updated_cluster_size, alpha=1 - self.decay)
-            dw = torch.matmul(encodings.t(), flat_inputs)
-            self.ema_w.mul_(self.decay).add_(dw, alpha=1 - self.decay)
+            with torch.no_grad():
+                updated_cluster_size = encodings.sum(dim=0)
+                self.ema_cluster_size.mul_(self.decay).add_(updated_cluster_size, alpha=1 - self.decay)
+                dw = torch.matmul(encodings.t(), flat_inputs)
+                self.ema_w.mul_(self.decay).add_(dw, alpha=1 - self.decay)
 
-            n = self.ema_cluster_size.sum()
-            normalized_cluster_size = (self.ema_cluster_size + self.epsilon) / (n + self.num_embeddings * self.epsilon) * n
-            self.embedding.copy_(self.ema_w / normalized_cluster_size.unsqueeze(1))
+                n = self.ema_cluster_size.sum()
+                normalized_cluster_size = (self.ema_cluster_size + self.epsilon) / (n + self.num_embeddings * self.epsilon) * n
+                self.embedding.copy_(self.ema_w / normalized_cluster_size.unsqueeze(1))
 
         # Losses
         commitment_loss = F.mse_loss(quantized.detach(), inputs)

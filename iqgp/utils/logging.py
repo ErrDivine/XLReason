@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 
@@ -15,7 +15,7 @@ class ProgressLogger:
     def log(self, step: int, message: str, extra: Dict[str, Any] | None = None) -> None:
         if step % self.log_every != 0:
             return
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         payload = {"time": now, "step": step, "message": message}
         if extra:
             payload.update(extra)
