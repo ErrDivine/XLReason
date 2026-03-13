@@ -9,8 +9,9 @@ import torch
 
 try:
     from transformers import AutoModel, AutoTokenizer
-except ImportError as exc:  # pragma: no cover - handled in tests
-    raise ImportError("transformers package is required for TransformerBackbone") from exc
+except ImportError:  # pragma: no cover - optional dependency
+    AutoModel = None  # type: ignore[assignment,misc]
+    AutoTokenizer = None  # type: ignore[assignment,misc]
 
 
 @dataclass
@@ -30,6 +31,8 @@ class TransformerBackbone:
         use_fast_tokenizer: bool = True,
         **model_kwargs,
     ) -> "TransformerBackbone":
+        if AutoTokenizer is None or AutoModel is None:
+            raise ImportError("transformers package is required for TransformerBackbone")
         tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_name or model_name,
             revision=revision,

@@ -7,7 +7,7 @@ name = "xlreason-iqgp"
 version = "0.1.0"
 description = "Bilingual reasoning via an interlingua QID-Graph planner"
 authors = [{name = "ErrDivine"}]
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "torch>=2.0",
@@ -19,6 +19,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+
+[tool.setuptools.packages.find]
+include = ["iqgp*"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

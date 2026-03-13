@@ -21,12 +21,12 @@ from iqgp.planner import InterlinguaPlanner, PlannerOutput
 
 @dataclass
 class ModelConfig:
-    vocab_size: Optional[int] = None
     num_entities: int
     num_units: int
     num_nodes: int
     codebook_size: int
     embedding_dim: int
+    vocab_size: Optional[int] = None
     num_edge_types: int = 4
     commitment_cost: float = 0.25
     attn_heads: int = 4
